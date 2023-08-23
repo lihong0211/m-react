@@ -45,7 +45,7 @@ class Updater {
 }
 
 export class Component {
-  static is_class_component = true;
+  static IS_CLASS_COMPONENT = true;
 
   constructor(props) {
     this.props = props;
@@ -62,7 +62,7 @@ export class Component {
     const oldVNode = this.oldVNode;
     const newVNode = this.render();
     const DOM = getDomByVNode(oldVNode);
-    updateDomToTree(DOM, newVNode);
+    updateDomToTree(oldVNode, newVNode, DOM);
     this.oldVNode = newVNode;
   }
 }

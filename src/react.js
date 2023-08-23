@@ -1,4 +1,5 @@
-import { REACT_ELEMENT, REACT_FORWARD_REF } from './utils';
+import { REACT_ELEMENT, REACT_FORWARD_REF } from './constants';
+import { toVNode } from './utils';
 import { Component } from './component';
 
 function createElement(type, properties, children) {
@@ -10,9 +11,9 @@ function createElement(type, properties, children) {
   const props = { ...properties };
   // children 为多个的时候处理下
   if (arguments.length > 3) {
-    props.children = Array.prototype.slice.call(arguments, 2);
+    props.children = Array.prototype.slice.call(arguments, 2).map(children);
   } else {
-    props.children = children;
+    props.children = toVNode(children);
   }
   return {
     $$typeof: REACT_ELEMENT,
