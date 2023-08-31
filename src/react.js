@@ -11,7 +11,12 @@ function createElement(type, properties, children) {
   const props = { ...properties };
   // children 为多个的时候处理下
   if (arguments.length > 3) {
-    props.children = Array.prototype.slice.call(arguments, 2).map(children);
+    // 可能会是[VNode, [VNode, VNode, VNode, VNode]]，所以需要flat
+    props.children = Array.prototype.slice
+      .call(arguments, 2)
+      .flat(Infinity)
+      .map(toVNode)
+      .filter((child) => !!child);
   } else {
     props.children = toVNode(children);
   }

@@ -1,22 +1,26 @@
-import { REACT_ELEMENT, REACT_FORWARD_REF, REACT_TEXT } from './constants';
+import {
+  REACT_ELEMENT,
+  REACT_FORWARD_REF,
+  REACT_TEXT,
+  CREATE,
+  MOVE,
+} from './constants';
 import { addEvent } from './event';
 
 function render(VNode, containerDOM) {
-  // 虚拟DOM--> 真实DOM
-  // 真实DOM挂载到containerDOM
   mount(VNode, containerDOM);
 }
 
 function mount(VNode, containerDOM) {
+  // 虚拟DOM--> 真实DOM
+  // 真实DOM挂载到containerDOM
   const newDOM = createDOM(VNode);
   newDOM && containerDOM.appendChild(newDOM);
 }
 
 function createDOM(VNode) {
-  // VNode 是一个数字
-  if (typeof VNode === 'number') return document.createTextNode(VNode);
-
   // 1.创建元素。 2.处理子元素。3.处理元素属性 4.处理ref
+  if (!VNode) return document.createComment(VNode);
   const { type, props, ref } = VNode;
   let dom;
   // 类组件
@@ -38,7 +42,7 @@ function createDOM(VNode) {
   if (VNode.$$typeof === REACT_ELEMENT) {
     dom = document.createElement(type);
   }
-  if (VNode.$$typeof === REACT_TEXT) {
+  if (VNode.type === REACT_TEXT) {
     dom = document.createTextNode(props.text);
   }
   // 子元素
@@ -61,7 +65,7 @@ function createDOM(VNode) {
 
 function mountArray(children, parent) {
   for (let i = 0; i < children.length; i++) {
-    children.index = i; // diff有用
+    children[i].index = i; // diff有用
     mount(children[i], parent);
   }
 }
@@ -78,7 +82,7 @@ function setProps(dom, VNodeProps = {}) {
       });
     } else {
       // TODO: 设置报错
-      // dom[k] = VNodeProps[k];
+      dom[k] = VNodeProps[k];
     }
   }
 }
@@ -102,7 +106,14 @@ function genDomByClassComp(VNode) {
 
   instance.oldVNode = renderVNode;
   if (!renderVNode) return null;
-  return createDOM(renderVNode);
+  // 这里只是dom合renderVNode的关系
+  const dom = createDOM(renderVNode);
+  if (instance.componentDidMount) {
+    instance.componentDidMount();
+  }
+  // {showComponent && <ComponentA>}  这里需要设置原始VNode和dom的关系
+  VNode.dom = dom;
+  return dom;
 }
 
 function genDomByForwardFunction(VNode) {
@@ -130,8 +141,8 @@ export function updateDomToTree(oldVNode, newVNode, oldDOM) {
     DEL: oldVNode && !newVNode,
     REPLACE: oldVNode && newVNode && oldVNode.type !== newVNode.type,
   };
-  const UPDATE_TYPE = Object.keys(updateTypeMap).filter((key) =>
-    updateTypeMap(key)
+  const UPDATE_TYPE = Object.keys(updateTypeMap).filter(
+    (key) => updateTypeMap[key]
   )[0];
   switch (UPDATE_TYPE) {
     case 'NOOP':
@@ -163,7 +174,7 @@ function deepDOMDiff(oldVNode, newVNode) {
     CLASS_COMPONENT:
       typeof oldVNode.type === 'function' && oldVNode.type.IS_CLASS_COMPONENT,
     FUNCTION_COMPONENT: typeof oldVNode.type === 'function',
-    TEXT: typeof oldVNode.type === REACT_TEXT,
+    TEXT: oldVNode.type === REACT_TEXT,
   };
   const DIFF_TYPE = Object.keys(diffTypeMap).filter(
     (key) => diffTypeMap[key]
@@ -189,11 +200,82 @@ function deepDOMDiff(oldVNode, newVNode) {
   }
 }
 
-function updateChildren(parentDOM, oldVNodeChildren, newVNodeChildren) {}
+function updateChildren(parentDOM, oldVNodeChildren, newVNodeChildren) {
+  oldVNodeChildren = Array.isArray(oldVNodeChildren)
+    ? oldVNodeChildren
+    : [oldVNodeChildren];
+  newVNodeChildren = Array.isArray(newVNodeChildren)
+    ? newVNodeChildren
+    : [newVNodeChildren];
+
+  let lastNotChangedIndex = -1;
+  const oldKeyChildMap = {};
+
+  oldVNodeChildren.forEach((oldVNode, index) => {
+    const oldKey = oldVNode?.key || index;
+    oldKeyChildMap[oldKey] = oldVNode;
+  });
+
+  const actions = [];
+  newVNodeChildren.forEach((newVNode, index) => {
+    !!newVNode && (newVNode.index = index);
+    const newKey = newVNode?.key || index;
+    const oldVNode = oldKeyChildMap[newKey];
+    if (oldVNode) {
+      deepDOMDiff(oldVNode, newVNode);
+      if (oldVNode.index < lastNotChangedIndex) {
+        actions.push({
+          type: MOVE,
+          oldVNode,
+          newVNode,
+          index,
+        });
+      }
+      // 需要移动的子节点在map中删掉，map中最后剩下的是在newVNodechildren中不存在的，需要删除
+      delete oldKeyChildMap[newKey];
+      lastNotChangedIndex = Math.max(lastNotChangedIndex, oldVNode.index);
+    } else {
+      actions.push({ type: CREATE, newVNode, index });
+    }
+  });
+
+  const VNodesToMove = actions
+    .filter((action) => action.type === MOVE)
+    .map((action) => action.oldVNode);
+  const VNodesToDelete = Object.values(oldKeyChildMap);
+  // 在parentNode中将需要移动和删除的子节点都删掉
+  VNodesToMove.concat(VNodesToDelete).forEach((oldVNode) => {
+    const oldDOM = getDomByVNode(oldVNode);
+    oldDOM && oldDOM.remove();
+    // 如果是组件卸载
+    if (!!oldVNode?.classInstance) {
+      oldVNode.classInstance?.componentWillUnmount();
+    }
+  });
+
+  actions.forEach((actions) => {
+    const { type, oldVNode, newVNode, index } = actions;
+    // 删除后剩下的子节点
+    const childNodes = parentDOM.childNodes;
+    // ?
+    const childNode = childNodes[index];
+    const insertDom =
+      type === CREATE ? createDOM(newVNode) : getDomByVNode(oldVNode);
+    if (childNode) {
+      parentDOM.insertBefore(insertDom, childNode);
+    } else {
+      parentDOM.insertBefore(insertDom, null);
+    }
+  });
+}
 
 function updateClassComponent(oldVNode, newVNode) {
   const classInstance = (newVNode.classInstance = oldVNode.classInstance);
-  classInstance.updater.launchUpdate();
+  // 更新的时候需要用最新的props
+  classInstance.props = newVNode.props;
+  newVNode.dom = oldVNode.dom;
+
+  classInstance.updater.launchUpdate(newVNode.props);
 }
 
 function updateFunctionComponent(oldVNode, newVNode) {

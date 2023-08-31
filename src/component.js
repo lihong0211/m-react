@@ -33,14 +33,27 @@ class Updater {
     }
   }
 
-  launchUpdate() {
-    while (this.pendingStates.length) {
-      this.target.state = {
-        ...this.target.state,
-        ...this.pendingStates.shift(),
+  launchUpdate(nextProp) {
+    const { pendingStates, target } = this;
+    if (!this.pendingStates && !nextProp) return;
+
+    while (pendingStates.length) {
+      target.state = {
+        ...target.state,
+        ...pendingStates.shift(),
       };
     }
-    this.target.update();
+    let shouldUpdate = true;
+    if (nextProp) {
+      this.target.props = nextProp;
+    }
+    if (
+      target.shouldComponentUpdate &&
+      !target.shouldComponentUpdate(nextProp, target.state)
+    ) {
+      shouldUpdate = false;
+    }
+    shouldUpdate && target.update();
   }
 }
 
@@ -56,13 +69,30 @@ export class Component {
   setState(partialState) {
     // 合并属性
     this.updater.addState(partialState);
-    this.update();
+    // this.update();
   }
   update() {
     const oldVNode = this.oldVNode;
+
+    if (!!this.constructor.getDerivedStateFromProps) {
+      this.state = {
+        ...this.state,
+        ...this.constructor.getDerivedStateFromProps(this.props),
+      };
+    }
+
     const newVNode = this.render();
-    const DOM = getDomByVNode(oldVNode);
-    updateDomToTree(oldVNode, newVNode, DOM);
+
+    newVNode.dom = oldVNode.dom;
+    const oldDOM = getDomByVNode(oldVNode);
+    if (this.getSnapShotBeforeUpdate) {
+    }
+
+    updateDomToTree(oldVNode, newVNode, oldDOM);
+    if (this.componentDidUpdate) {
+      this.componentDidUpdate();
+    }
     this.oldVNode = newVNode;
+    // this.updater = new Updater(this);
   }
 }

@@ -21,6 +21,7 @@ function dispatchEvent(nativeEvent) {
     }
     target = target.parentNode;
   }
+  debugger;
   flushUpdateQueue();
 }
 

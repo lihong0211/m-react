@@ -1,5 +1,6 @@
 import ReactDom from './react-dom';
 import React from './react';
-import { TestFunctionComp, TestClassComp } from './test-case';
+import { TestFunctionComp, TestClassComp, TestDomDiffComp } from './test-case';
 
-ReactDom.render(<TestFunctionComp />, document.getElementById('root'));
+ReactDom.render(<TestDomDiffComp />, document.getElementById('root'));
+// console.log(<TestClassComp />);
