@@ -224,3 +224,40 @@ export class TestDomDiffComp extends React.Component {
     );
   }
 }
+
+export class TestMemo extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      name: 'lihong',
+      age: 35,
+    };
+  }
+
+  changeName(name) {
+    this.setState(name);
+  }
+
+  render() {
+    return (
+      <div>
+        <input
+          value={this.state.name}
+          onChange={(e) => this.changeName(e.target.value).bind(this)}
+        />
+        <input value={this.state.age} onChange={() => console.log(this)} />
+        <Greeting name={this.name} />
+      </div>
+    );
+  }
+}
+
+const Greeting = React.memo(function Greeting({ name }) {
+  console.log('重新渲染', new Date().toLocaleTimeString());
+  return (
+    <h3>
+      Hello{name && ', '}
+      {name}!
+    </h3>
+  );
+});

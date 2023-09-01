@@ -1,6 +1,6 @@
 import { getDomByVNode, updateDomToTree } from './react-dom';
+import { deepClone } from './utils';
 
-// TODO: wtf
 export const updateQueue = {
   isBatch: false,
   updaters: new Set(),
@@ -36,7 +36,7 @@ class Updater {
   launchUpdate(nextProp) {
     const { pendingStates, target } = this;
     if (!this.pendingStates && !nextProp) return;
-
+    target.prevState = deepClone(target.state);
     while (pendingStates.length) {
       target.state = {
         ...target.state,
@@ -63,6 +63,7 @@ export class Component {
   constructor(props) {
     this.props = props;
     this.state = {};
+    this.prevState = {};
     this.updater = new Updater(this);
   }
 
@@ -73,7 +74,6 @@ export class Component {
   }
   update() {
     const oldVNode = this.oldVNode;
-
     if (!!this.constructor.getDerivedStateFromProps) {
       this.state = {
         ...this.state,
@@ -83,16 +83,16 @@ export class Component {
 
     const newVNode = this.render();
 
+    this.getSnapshotBeforeUpdate &&
+      this.getSnapshotBeforeUpdate(this.props, this.prevState);
+
     newVNode.dom = oldVNode.dom;
     const oldDOM = getDomByVNode(oldVNode);
-    if (this.getSnapShotBeforeUpdate) {
-    }
 
     updateDomToTree(oldVNode, newVNode, oldDOM);
     if (this.componentDidUpdate) {
       this.componentDidUpdate();
     }
     this.oldVNode = newVNode;
-    // this.updater = new Updater(this);
   }
 }

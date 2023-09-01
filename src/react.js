@@ -1,8 +1,9 @@
-import { REACT_ELEMENT, REACT_FORWARD_REF } from './constants';
-import { toVNode } from './utils';
+import { REACT_ELEMENT, REACT_FORWARD_REF, REACT_MEMO } from './constants';
+import { toVNode, shallowEqual } from './utils';
 import { Component } from './component';
 
 function createElement(type, properties, children) {
+  // TODO: <></> Fragement
   const { key = null, ref = null } = properties;
   ['ref', 'key', '__self', '__source'].forEach((item) => {
     // key ref 是框架需要，props是dom属性相关， 所以分开处理
@@ -33,6 +34,14 @@ function createElement(type, properties, children) {
   };
 }
 
+class pureComponent extends Component {
+  shouldComponentUpdate(nextProp, nextState) {
+    return !(
+      shallowEqual(nextProp, this.props) && shallowEqual(nextState, this.state)
+    );
+  }
+}
+
 function createRef() {
   return { current: null };
 }
@@ -44,9 +53,19 @@ function forWardRef(render) {
   };
 }
 
+function memo(type, compare) {
+  return {
+    $$typeof: REACT_MEMO,
+    type,
+    compare,
+  };
+}
+
 const React = {
   createElement,
   Component,
+  pureComponent,
+  memo,
   createRef,
   forWardRef,
 };

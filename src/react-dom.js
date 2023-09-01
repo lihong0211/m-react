@@ -4,8 +4,10 @@ import {
   REACT_TEXT,
   CREATE,
   MOVE,
+  REACT_MEMO,
 } from './constants';
 import { addEvent } from './event';
+import { shallowEqual } from './utils';
 
 function render(VNode, containerDOM) {
   mount(VNode, containerDOM);
@@ -35,10 +37,15 @@ function createDOM(VNode) {
   if (typeof type === 'function' && VNode.$$typeof === REACT_ELEMENT) {
     return genDomByFunctionComp(VNode);
   }
-  //
+  // forWardRef
   if (type && type.$$typeof === REACT_FORWARD_REF) {
     return genDomByForwardFunction(VNode);
   }
+  // memo
+  if (type && type.$$typeof === REACT_MEMO) {
+    return genDomByMemo(VNode);
+  }
+
   if (VNode.$$typeof === REACT_ELEMENT) {
     dom = document.createElement(type);
   }
@@ -80,9 +87,13 @@ function setProps(dom, VNodeProps = {}) {
       Object.keys(VNodeProps[k]).forEach((styleItem) => {
         dom.style[styleItem] = VNodeProps[k][styleItem];
       });
+    } else if (k === 'className') {
+      dom.setAttribute('class', VNodeProps[k]);
     } else {
       // TODO: 设置报错
-      dom[k] = VNodeProps[k];
+      if (dom.setAttribute && !['children', 'text'].includes(k)) {
+        dom.setAttribute && dom.setAttribute(k, VNodeProps[k]);
+      }
     }
   }
 }
@@ -120,6 +131,14 @@ function genDomByForwardFunction(VNode) {
   const { type, props, ref } = VNode;
   const renderVNode = type.render(props, ref);
   if (!renderVNode) return null;
+  return createDOM(renderVNode);
+}
+
+function genDomByMemo(VNode) {
+  const { type, props } = VNode;
+  const renderVNode = type.type(props);
+  if (!renderVNode) return null;
+  VNode.oldRenderVNode = renderVNode;
   return createDOM(renderVNode);
 }
 
@@ -175,6 +194,7 @@ function deepDOMDiff(oldVNode, newVNode) {
       typeof oldVNode.type === 'function' && oldVNode.type.IS_CLASS_COMPONENT,
     FUNCTION_COMPONENT: typeof oldVNode.type === 'function',
     TEXT: oldVNode.type === REACT_TEXT,
+    MEMO: oldVNode.type === REACT_MEMO,
   };
   const DIFF_TYPE = Object.keys(diffTypeMap).filter(
     (key) => diffTypeMap[key]
@@ -190,6 +210,9 @@ function deepDOMDiff(oldVNode, newVNode) {
       break;
     case 'FUNCTION_COMPONENT':
       updateFunctionComponent(oldVNode, newVNode);
+      break;
+    case 'MEMO':
+      updateMemo(oldVNode, newVNode);
       break;
     case 'TEXT':
       newVNode.dom = getDomByVNode(oldVNode);
@@ -284,6 +307,19 @@ function updateFunctionComponent(oldVNode, newVNode) {
   const newRenderVNode = type(props);
   updateDomToTree(oldVNode.oldRenderVNode, newRenderVNode, oldDOM);
   newVNode.oldRenderVNode = newRenderVNode;
+}
+
+function updateMemo(oldVNode, newVNode) {
+  const { type } = oldVNode;
+  if (!type.compare(oldVNode.props, newVNode.props)) {
+    const oldDOM = getDomByVNode(oldVNode);
+    const { type, props } = newVNode;
+    const newRenderVNode = type.type(props);
+    updateDomToTree(oldVNode.oldRenderVNode, newRenderVNode, oldDOM);
+    newVNode.oldRenderVNode = newRenderVNode;
+  } else {
+    newVNode.oldRenderVNode = oldVNode.oldRenderVNode;
+  }
 }
 
 const ReactDom = {
