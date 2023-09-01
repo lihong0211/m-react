@@ -61,7 +61,6 @@ function updateChildren(oldChildren, newChildren, Container) {
   // --> ['C', 'B', 'E'] --> ['C', 'B', 'E', 'F'] --> ['C', 'B', 'E', 'F', 'A']
   actions.forEach((action) => {
     const { index, newVNode } = action;
-    debugger;
     const item = Container[index];
     if (item) {
       Container.splice(index, 0, newVNode.key);

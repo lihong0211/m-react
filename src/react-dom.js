@@ -7,7 +7,6 @@ import {
   REACT_MEMO,
 } from './constants';
 import { addEvent } from './event';
-import { shallowEqual } from './utils';
 
 function render(VNode, containerDOM) {
   mount(VNode, containerDOM);
@@ -139,7 +138,8 @@ function genDomByMemo(VNode) {
   const renderVNode = type.type(props);
   if (!renderVNode) return null;
   VNode.oldRenderVNode = renderVNode;
-  return createDOM(renderVNode);
+  const dom = (VNode.oldRenderVNode.dom = createDOM(renderVNode));
+  return dom;
 }
 
 // 获取VNode上缓存的dom
@@ -194,7 +194,7 @@ function deepDOMDiff(oldVNode, newVNode) {
       typeof oldVNode.type === 'function' && oldVNode.type.IS_CLASS_COMPONENT,
     FUNCTION_COMPONENT: typeof oldVNode.type === 'function',
     TEXT: oldVNode.type === REACT_TEXT,
-    MEMO: oldVNode.type === REACT_MEMO,
+    MEMO: oldVNode.type.$$typeof === REACT_MEMO,
   };
   const DIFF_TYPE = Object.keys(diffTypeMap).filter(
     (key) => diffTypeMap[key]
@@ -312,7 +312,7 @@ function updateFunctionComponent(oldVNode, newVNode) {
 function updateMemo(oldVNode, newVNode) {
   const { type } = oldVNode;
   if (!type.compare(oldVNode.props, newVNode.props)) {
-    const oldDOM = getDomByVNode(oldVNode);
+    const oldDOM = getDomByVNode(oldVNode.oldRenderVNode);
     const { type, props } = newVNode;
     const newRenderVNode = type.type(props);
     updateDomToTree(oldVNode.oldRenderVNode, newRenderVNode, oldDOM);

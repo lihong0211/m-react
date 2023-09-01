@@ -243,21 +243,29 @@ export class TestMemo extends React.Component {
       <div>
         <input
           value={this.state.name}
-          onChange={(e) => this.changeName(e.target.value).bind(this)}
+          onChange={(e) => this.setState({ name: e.target.value })}
         />
-        <input value={this.state.age} onChange={() => console.log(this)} />
-        <Greeting name={this.name} />
+        <input
+          value={this.state.age}
+          onChange={(e) => this.setState({ age: e.target.value })}
+        />
+        <Greeting name={this.state.name} />
       </div>
     );
   }
 }
 
-const Greeting = React.memo(function Greeting({ name }) {
-  console.log('重新渲染', new Date().toLocaleTimeString());
-  return (
-    <h3>
-      Hello{name && ', '}
-      {name}!
-    </h3>
-  );
-});
+const Greeting = React.memo(
+  function Greeting({ name }) {
+    console.log('重新渲染', new Date().toLocaleTimeString());
+    return (
+      <h3>
+        Hello{name && ', '}
+        {name}!
+      </h3>
+    );
+  },
+  function compareProps(prevProps, nextProps) {
+    return prevProps.name === nextProps.name;
+  }
+);
